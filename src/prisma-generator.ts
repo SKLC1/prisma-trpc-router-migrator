@@ -104,32 +104,28 @@ export async function generate(options: GeneratorOptions) {
         ),
     );
     if (!modelActions.length) continue;
-
     const plural = pluralize(model.toLowerCase());
-
     generateRouterImport(appRouter, plural, model);
+    // Create a new directory for each model
+    const modelDirectory = path.resolve(outputDir, 'routers', model);
+    await fs.mkdir(modelDirectory, { recursive: true });
     const modelRouter = project.createSourceFile(
-      path.resolve(outputDir, 'routers', `${model}.router.ts`),
+      path.resolve(modelDirectory, `${model}.router.ts`),
       undefined,
       { overwrite: true },
     );
-
     generateCreateRouterImport({
       sourceFile: modelRouter,
       config,
     });
-
     if (config.withZod) {
       generateRouterSchemaImports(modelRouter, model, modelActions);
     }
-
     modelRouter.addStatements(/* ts */ `
       export const ${plural}Router = t.router({`);
-
     for (const opType of modelActions) {
       const opNameWithModel = operations[opType];
       const baseOpType = opType.replace('OrThrow', '');
-
       generateProcedure(
         modelRouter,
         opNameWithModel,
@@ -140,19 +136,15 @@ export async function generate(options: GeneratorOptions) {
         config,
       );
     }
-
     modelRouter.addStatements(/* ts */ `
     })`);
-
     modelRouter.formatText({ indentSize: 2 });
     routerStatements.push(/* ts */ `
       ${model.toLowerCase()}: ${plural}Router`);
   }
-
   appRouter.addStatements(/* ts */ `
     export const appRouter = t.router({${routerStatements}})
     `);
-
   appRouter.formatText({ indentSize: 2 });
   await project.save();
 }
